@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# This script will transform a String to a sound file, but will not play
+# it! Return will be the path to the sound file.
+
+# usage google.tts -l LANG -c "This is want I want to say"
+
+# LANG (de:german, en:english) 
+# -c: 	This is caching. This will fasten playback and also reducing pings
+#		to google.
+
+# Confif variables
+
+debuglevel=0 	# sets debug level
+lang="en"		# default language 
+usecache=0 		# default caching behavior
+stringset=0 	# temp var to get some commandline errors
+
+# this has been added to evaluate time difference with -cache option
+if [ $debuglevel -gt 0 ]; then
+	time1=$(date +%s%N | cut -b1-13)
+fi
+
+# commandline options
+
+while (( "$#" )); 
+do
+    case "$1" in 
+	"-l")
+		shift
+		lang=$1
+		shift
+	;;
+	"-c")
+		shift
+		usecache=1
+	;;
+	*) # this should be the string
+		if [ $stringset -eq 1 ]; then
+			echo "ERROR: unknown option or something else is wrong"
+			echo $stringset
+			exit 1
+		fi
+		string=$1
+		stringset=1
+		shift
+	;;
+	esac
+done
+
+# Caching: String+language gets md5 hash. If this hash exists, then echo file
+# right away. This gives about 100ms faster ouptut
+
+if [ $usecache -eq 1 ]; then
+	md5str=`echo -n "$string$lang" | md5sum | awk '{ print $1 }'`
+	if [ -e /dev/shm/$md5str.mp3 ] ; then
+		#play /dev/shm/$md5str.mp3 speed 1.00 pitch 0
+		echo -n "/dev/shm/$md5str.mp3"
+		exit 0
+		
+		# this will also print timing info, cannot be used in real life
+		if [ $debuglevel -gt 0 ]; then
+			time2=$(date +%s%N | cut -b1-13)
+			echo $(($time2-$time1))
+		fi
+	fi
+else
+	md5str="nomd5" # if no md5 sum is calculated
+fi
+
+# empty the original file
+echo "" > "/dev/shm/$md5str.mp3"
+
+# maximum number of characters, this is code by Stephen Hickson
+len=${#string}
+while [ $len -ge 100 ] ;
+do
+    # lets split this up so that its a maximum of 99 characters
+    tmp=${string:0:100}
+    string=${string:100}
+    
+    # now we need to make sure there aren't split words, let's find the last space and the string after it
+    lastspace=${tmp##* }
+    tmplen=${#lastspace}
+
+    # here we are shortening the tmp string
+    tmplen=`expr 100 - $tmplen` 
+    tmp=${tmp:0:tmplen}
+    
+    # now we concatenate and the string is reconstructed
+    string="$lastspace$string"
+    len=${#string}
+    
+    # get the first 100 characters
+    wget -q -U Mozilla -O "/dev/shm/tmp.mp3" "http://translate.google.com/translate_tts?tl=${lang}&q=$tmp"
+    cat "/dev/shm/tmp.mp3" >> "/dev/shm/$md5str.mp3"
+done
+# this will get the last remnants
+wget -q -U Mozilla -O "/dev/shm/tmp.mp3" "http://translate.google.com/translate_tts?tl=${lang}&q=$string"
+cat "/dev/shm/tmp.mp3" >> "/dev/shm/$md5str.mp3"
+
+# last thing, print file
+echo -n "/dev/shm/$md5str.mp3"
+
+# this will also print timing info, cannot be used in real life
+if [ $debuglevel -gt 0 ]; then
+	time2=$(date +%s%N | cut -b1-13)
+	echo $(($time2-$time1))
+fi
+
+exit 0
