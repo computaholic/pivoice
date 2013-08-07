@@ -48,7 +48,13 @@ $scn_start = scenario_get_start(%scn_all);
 %dict_all = dict_get_all(%scn_all);
 
 # For now we will fake an input string
-my $input="Pi";
+my $INPUT=" play wow from bANg   \n";
+
+# now removing blanks at the beginning and the end
+chomp ($INPUT);
+$INPUT =~ s/^(( )*)?//;
+$INPUT =~ s/( )*?$//;
+
 
 # now lets see if we can find the string
 $scn_current=$scn_start;
@@ -66,13 +72,60 @@ for ( keys $dict_all{$scn_current} )
 		
 		# lets check the MatchStyle (this is an ifthenelse-war, but perl
 		# does not consistently support switch statements
+		
+		print "pivoice.pl:\tMatch Type for command $command is $matchstyle\n" if ($debug);
+		
 		if ( $matchstyle eq "simple" )
 		{
-			print "pivoice.pl:\tMatch Type for command $command is $matchstyle\n" if ($debug);
-		}elsif ( $matchstyle eq "regex" )
+			# simple means, absulute match.
+			# we convert that into a regex and proceed
+			# regex is /regex/, b/c we cant put '/' in a string
+			# also: if $(...) is detected, it will be replaced by a group
+			my $listen = $dict_all{$scn_current}{$_}{"ListenFor"};
+			chomp($listen);
+			
+			# replacing $(..)
+			$listen =~ s/\$(\w*)?/\(\\w\*\)\?/g;
+			
+			# checking for absolute or non absulte match
+			if ( ($listen =~ /^~/) )
+			{
+				print "pivoice.pl:\tUsing NON absulute match\n" if ($debug);
+				$listen =~ s/(^~( *))//;
+			}
+			else
+			{
+				print "pivoice.pl:\tUsing absulute match\n" if ($debug);
+				$listen = "^$listen\$";
+			}
+			
+			print "pivoice.pl:\tGenerated regex $listen\n" if ($debug);
+			
+			# now put that regex back in and change MatchType, so we 
+			# dont have to that again
+			$dict_all{$scn_current}{$_}{"ListenFor"} = $listen;
+			$dict_all{$scn_current}{$_}{"MatchType"} = "regex";
+			
+			# updating help variables
+			$match 		= $dict_all{$scn_current}{$_}{"ListenFor"};
+			$matchstyle 	= $dict_all{$scn_current}{$_}{"MatchStyle"};
+		
+		}
+		
+		# matching regex against $INPUT
+		if ( $INPUT =~ /$match/ )
 		{
-			print "pivoice.pl:\tMatch Type for command $command is $matchstyle\n" if ($debug);
+			my  @match_list = ( $INPUT =~ /$match/ );
+			print "pivoice.pl:\tVoice command |$INPUT| matches $match\n" if ($debug);
+			print "pivoice.pl:\tCommand has ", scalar @match_list, " parameters: " if ($debug);
+			print "$_ " for @match_list;
+			print "\n\n" if ($debug);
+			
 		} 
+		else
+		{
+			print "pivoice.pl:\tVoice command |$INPUT| does not match $match\n\n" if ($debug);
+		}
 	}
 }
 
@@ -108,7 +161,7 @@ sub dict_get_all(\%)
 			$dict_all{$_} = \%tmp_dict;
 			
 			# debug information
-			print "pivoice.pl:\tTied ", \%tmp_dict, " to file $dict_files{$_}\n" if ($debug);
+			print "pivoice.pl:\tTied ", \%tmp_dict, " to file $dict_files{$_}\n\n" if ($debug);
 		}
 	}
 	
@@ -124,13 +177,14 @@ sub scenario_get_start(\%)
 	{
 		if (/^\*/) # probing if first character is '*'
 		{
-			print "pivoice.pl:\tStarting scenario is $_\n" if ($debug);
+			print "pivoice.pl:\tStarting scenario is $_\n\n" if ($debug);
 			return $_;
 		}
 	}
 	
 	# if this gets executed, then no starting scenario was found
-	print "pivoice.pl:\tNo Starting scenario found\n" if ($debug);
+	print "pivoice.pl:\tNo Starting scenario found\n\n" if ($debug);
+	
 	return 1; 
 }
 

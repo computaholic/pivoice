@@ -5,11 +5,11 @@
 	Action		= sudo service mpd start
 
 [playsong]
-	ListenFor 	= play $song from $band
+	ListenFor 	=~ play $song from $band
 	Action 		= vlc /path/to/music/$band/$song.mp3
 
 [playvideo]
-	ListenFor 	= /^play\b(.*?)\bseason (.*?) episode (.*?)/
+	ListenFor 	= ^play\b(.*?)\bseason (.*?) episode (.*?)
 	MatchStyle	= regex # default: simple
 	Action 		= mplayer /videos/$1/season_$2/episode_$3
 	
