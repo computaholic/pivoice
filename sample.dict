@@ -12,3 +12,7 @@
 	ListenFor 	= /^play\b(.*?)\bseason (.*?) episode (.*?)/
 	MatchStyle	= regex # default: simple
 	Action 		= mplayer /videos/$1/season_$2/episode_$3
+	
+[default]
+	MatchStyle 	= simple
+	Action 		= NONE

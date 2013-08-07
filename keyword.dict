@@ -2,4 +2,8 @@
 
 [keyword]
 	ListenFor 	= Hello Pi
+	
+[default]
+	MatchStyle 	= simple
+	Action 		= NONE
 
