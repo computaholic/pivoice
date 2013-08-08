@@ -2,17 +2,18 @@
 
 [playmusic]
 	ListenFor 	= play music
-	Action		= sudo service mpd start
+	Action		= echo "<play music>"
 
 [playsong]
 	ListenFor 	=~ play $song from $band
-	Action 		= vlc /path/to/music/$band/$song.mp3
+	Action 		= echo "vlc /path/to/music/$band/$song.mp3"
 
 [playvideo]
 	ListenFor 	= ^play\b(.*?)\bseason (.*?) episode (.*?)
-	MatchStyle	= regex # default: simple
-	Action 		= mplayer /videos/$1/season_$2/episode_$3
+	# default: simple
+	MatchStyle	= regex
+	Action 		= echo "mplayer /videos/$1/season_$2/episode_$3"
 	
 [default]
 	MatchStyle 	= simple
-	Action 		= NONE
+	Action 		= echo "NONE"

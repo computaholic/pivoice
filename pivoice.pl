@@ -48,7 +48,10 @@ $scn_start = scenario_get_start(%scn_all);
 %dict_all = dict_get_all(%scn_all);
 
 # For now we will fake an input string
-my $INPUT=" play wow from bANg   \n";
+my $INPUT="would you play wow from bANg and so on\n";
+#my $INPUT=" play music loud\n";
+
+
 
 # now removing blanks at the beginning and the end
 chomp ($INPUT);
@@ -85,6 +88,13 @@ for ( keys $dict_all{$scn_current} )
 			chomp($listen);
 			
 			# replacing $(..)
+			# first, save variable names
+			my counter=1;
+			
+			for ( $listen =~ /\$(\w*)?/g )
+			{
+				
+			}
 			$listen =~ s/\$(\w*)?/\(\\w\*\)\?/g;
 			
 			# checking for absolute or non absulte match
@@ -119,8 +129,12 @@ for ( keys $dict_all{$scn_current} )
 			print "pivoice.pl:\tVoice command |$INPUT| matches $match\n" if ($debug);
 			print "pivoice.pl:\tCommand has ", scalar @match_list, " parameters: " if ($debug);
 			print "$_ " for @match_list;
-			print "\n\n" if ($debug);
+			print "\n" if ($debug);
 			
+			my $action = $dict_all{$scn_current}{$_}{"Action"};
+			print "pivoice.pl:\tAction>>>>>>\n\n" if ($debug);
+			system($action);
+			print "\npivoice.pl:\tAction<<<<<<\n\n\n" if ($debug);
 		} 
 		else
 		{
