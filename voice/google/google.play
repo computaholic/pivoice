@@ -44,4 +44,4 @@ do
 done
 
 # now play the whole thing
-play $file speed $speed pitch $pitch
+play -t mp3 $file #speed $speed pitch $pitch

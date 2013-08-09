@@ -5,8 +5,8 @@
 	Action		= echo "<play music>"
 
 [playsong]
-	ListenFor 	=~ play $song from $band
-	Action 		= echo "vlc /path/to/music/$band/$song.mp3"
+	ListenFor 	=~ play $1 from $band
+	Action 		= echo "vlc /path/to/music/$band/$1.mp3"
 
 [playvideo]
 	ListenFor 	= ^play\b(.*?)\bseason (.*?) episode (.*?)
