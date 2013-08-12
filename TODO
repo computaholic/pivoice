@@ -1,3 +1,5 @@
 add HW switch to VOICE API
 work an conf and scenario files
-basic structure in perl
+regex generation for simple, absolute and non absolute should be better
+action not implemented
+TTS and STT not implemented

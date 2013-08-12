@@ -33,7 +33,8 @@ do
 	;;
 	"-c")
 		shift
-		usecache=1
+		usecache=$1
+		shift
 	;;
 	*) # this should be the string
 		if [ $stringset -eq 1 ]; then

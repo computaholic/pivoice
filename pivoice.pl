@@ -53,10 +53,9 @@ $scn_start = scenario_get_start(%scn_all);
 %dict_all = dict_get_all(%scn_all);
 
 # For now we will fake an input string
-my $INPUT="would you play wow from bANg and so on\n";
-#my $INPUT=" play music loud\n";
-
-
+#my $INPUT="would you play wow from bANg and so on\n";
+print "Enter INPUT: ";
+my $INPUT= <>;
 
 # now removing blanks at the beginning and the end
 chomp ($INPUT);
@@ -68,10 +67,12 @@ $INPUT =~ s/( )*?$//;
 $scn_current=$scn_start;
 
 # ~~~~~~~~~~~~~~~~~~~~~~~ TEST ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-print "pivoice.pl:\t\n\nSay Command is $scn_all{$scn_default}{Say}\n" if ($debug);
-
 my $say = $scn_all{$scn_default}{"say"};
+print "pivoice.pl:\t\n\nSay Command is $say\n" if ($debug);
+
 $say =~ s/\!(\w*)?/$scn_all{$scn_default}{$1}/g;
+$say =~ s/\!(\w*)?/$scn_all{$scn_default}{$1}/g;
+
 my $text = "Hallo, das ist mein erster Text";
 $say =~ s/\$INPUT/\"$text\"/;
 
