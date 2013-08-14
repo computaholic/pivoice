@@ -66,7 +66,7 @@ $INPUT =~ s/( )*?$//;
 # set current scenario to start scenario
 $scn_current=$scn_start;
 
-# ~~~~~~~~~~~~~~~~~~~~~~~ TEST ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ # ~~~~~~~~~~~~~~~~~~~~~~~ TEST ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 my $say = $scn_all{$scn_default}{"say"};
 print "pivoice.pl:\t\n\nSay Command is $say\n" if ($debug);
 
@@ -74,14 +74,15 @@ $say =~ s/\!(\w*)?/$scn_all{$scn_default}{$1}/g;
 $say =~ s/\!(\w*)?/$scn_all{$scn_default}{$1}/g;
 
 my $text = "Hallo, das ist mein erster Text";
-$say =~ s/\$INPUT/\"$text\"/;
+$say =~ s/\$INPUT//;
+
 
 print "pivoice.pl:\t\n\nSay Command is $say\n" if ($debug);
 
-system($say);
+system(split(' ', $say), " $text");
 
 print "\n\n\n";
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # going over all commands that are in the dict of current scenario
 for ( keys $dict_all{$scn_current} )
@@ -163,7 +164,15 @@ sub gen_regex_from_simple($$)
 	# simple means, absulute match.
 	# we convert that into a regex and proceed
 	# regex is /regex/, b/c we cant put '/' in a string
-	# also: if $(...) is detected, it will be replaced by a group
+	#
+	# also: 
+	# if $VAR is detected, it will be replaced by a group that 
+	# detects 1 word/number only
+	# if $_VAR is detected, it will be replaced by a 'taking all' regex,
+	# this is done to allow someting like this:
+	#
+	# ListenFor = google $_all
+	# Action    = script_to_google "$_all"
 	
 	my $listen = shift;
 	my $action = shift;
@@ -176,10 +185,18 @@ sub gen_regex_from_simple($$)
 	# first, save variable names
 	my $counter=1;
 	my $varname="";
+	my $mode="unset";
+	
+	#print "pivoice.pl:\tAll vars found: ", ( $listen =~ /(\$\w*)?|(\@\w*)?/g ), "\n" if ($debug);
 	for ( $listen =~ /\$(\w*)?/g )
 	{
 		# thats the first match in $listen
 		$varname = $_;
+		
+		# checking if scalar or array variable
+		$mode = "scalar" if ( $varname =~ /^[^\_]/ );
+		$mode = "array" if ( $varname =~ /^\_/ );
+		print "pivoice.pl:\tDetected mode is $mode\n" if ($debug);
 		
 		print "pivoice.pl:\tReplacing \$ vars\n" if ($debug);
 		print "pivoice.pl:\tFound varname \$$_\n" if ($debug);
@@ -194,8 +211,13 @@ sub gen_regex_from_simple($$)
 		$counter++;
 	}
 	
+	
 	# after replacing varnames in $action we gen. regex in $listen
-	$listen =~ s/\$(\w*)?/\(\\w\*\)\?/g;
+	$listen =~ s/\$[^_](\w*)?/\(\\w\*\)\?/g;
+	print "pivoice.pl:\tregex 1st run: $listen\n" if ($debug);
+	
+	$listen =~ s/\$[\_](\w*)?/\(\.\*\)\?/g;
+	print "pivoice.pl:\tregex 2nd run: $listen\n" if ($debug);
 	
 	# checking for absolute or non absulte match
 	if ( ($listen =~ /^~/) )
