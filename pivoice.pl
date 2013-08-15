@@ -29,6 +29,7 @@ my $debug=1;				# debuglevel
 # ----------------------------------------------------------------------
 # Prototypes
 # ----------------------------------------------------------------------
+sub expand_special_expression($$$\%\%);
 sub scenario_get_start(\%);
 sub dict_get_all(\%);
 sub gen_regex_from_simple($$);
@@ -52,6 +53,8 @@ $scn_start = scenario_get_start(%scn_all);
 # loading all dictionaries into one hash
 %dict_all = dict_get_all(%scn_all);
 
+
+
 # For now we will fake an input string
 #my $INPUT="would you play wow from bANg and so on\n";
 print "Enter INPUT: ";
@@ -63,26 +66,10 @@ $INPUT =~ s/^(( )*)?//;
 $INPUT =~ s/( )*?$//;
 
 
+my $test = expand_special_expression("!say", $scn_start, "playsong", %scn_all, %dict_all);
+
 # set current scenario to start scenario
 $scn_current=$scn_start;
-
-#~ # ~~~~~~~~~~~~~~~~~~~~~~~ TEST ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-my $say = $scn_all{$scn_default}{"say"};
-print "pivoice.pl:\t\n\nSay Command is $say\n" if ($debug);
-
-$say =~ s/\!(\w*)?/$scn_all{$scn_default}{$1}/g;
-$say =~ s/\!(\w*)?/$scn_all{$scn_default}{$1}/g;
-
-my $text = "Hallo, das ist mein erster Text";
-$say =~ s/\$INPUT//;
-
-
-print "pivoice.pl:\t\n\nSay Command is $say\n" if ($debug);
-
-system(split(' ', $say), " $text");
-
-print "\n\n\n";
-#~ # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # going over all commands that are in the dict of current scenario
 for ( keys $dict_all{$scn_current} )
@@ -142,7 +129,7 @@ for ( keys $dict_all{$scn_current} )
 		} 
 		else
 		{
-			print "pivoice.pl:\tVoice command |$INPUT| does not match $listen\n\n" if ($debug);
+			print "pivoice.pl:\tVoice command |$INPUT| does not match |$listen|\n\n" if ($debug);
 		}
 	}
 }
@@ -157,6 +144,54 @@ for ( keys $dict_all{$scn_current} )
 # ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
+# expanding !.. expressions
+# ----------------------------------------------------------------------
+sub expand_special_expression($$$\%\%)
+{
+	my $exp				= shift;	# !expression
+	my $current_scenario	= shift;	# current scenario
+	my $current_command	= shift;
+	my $scenarios 			= shift;	# hash with all scenarios
+	my $dicts				= shift;	# hash with all dicts
+	
+	# expansion is done in following steps
+	# while($command has !expressions)
+	# 1. expand by definition in current command, if not defined then
+	# 2. expand by definition in default command, if not defined then
+	# 3. expand by definition in current scenario, if not defined then
+	# 4. expand by definition in default scenario
+	# endwhile
+	#
+	# We will only need to do 1. and 3., because the used config module
+	# will automatically check for the default value if not given in 
+	# current (see tie %.. command)
+	
+	print "pivoice.pl:\tExpanding expression $exp\n" if ($debug);
+	while ( $exp =~ /\!(\w+)/ )
+	{
+	for ( $exp =~ /\!(\w+)/ )
+	{
+		print "pivoice.pl:\t.. $_ ..\n" if ($debug);
+		# $_ holds current !exp name without '!'
+		if ( defined $$dicts{$current_scenario}{$current_command}{$_} )
+		{
+			# replace found !.. by dict
+			$exp =~ s/\!(\w+)/$$dicts{$current_scenario}{$current_command}{$1}/;
+		}
+		elsif ( defined $$scenarios{$current_scenario}{$_} )
+		{
+			# replace found !.. by scenario
+			$exp =~ s/\!(\w+)/$$scenarios{$current_scenario}{$1}/;
+		}
+	} 
+	}
+
+	# return expanded command
+	print "pivoice.pl:\tExpanded to: $exp\n" if ($debug);
+	return $exp;
+}
+
+# ----------------------------------------------------------------------
 # generating regex from simple string
 # ----------------------------------------------------------------------
 sub gen_regex_from_simple($$)
@@ -168,14 +203,17 @@ sub gen_regex_from_simple($$)
 	# also: 
 	# if $VAR is detected, it will be replaced by a group that 
 	# detects 1 word/number only
-	# if $_VAR is detected, it will be replaced by a 'taking all' regex,
+	# if @VAR is detected, it will be replaced by a 'taking all' regex,
 	# this is done to allow someting like this:
 	#
-	# ListenFor = google $_all
-	# Action    = script_to_google "$_all"
+	# ListenFor = google @all
+	# Action    = script_to_google "@all"
 	
 	my $listen = shift;
 	my $action = shift;
+	
+	print "pivoice.pl:\t\$listen: $listen" if ($debug);
+	print "pivoice.pl:\t\$action: $action" if ($debug);
 	
 	
 	# cleaning up the listen words
@@ -186,6 +224,13 @@ sub gen_regex_from_simple($$)
 	my $counter=1;
 	my $varname="";
 	my $mode="unset";
+	
+	# first replace all @ by $_, this helps me to sort things easier
+	print "pivoice.pl:\tReplacing @ by \$_\n" if ($debug);
+	$listen =~ s/@(\w+?)/\$_$1/;
+	$action =~ s/@(\w+?)/\$_$1/;
+	print "pivoice.pl:\t\$listen: $listen" if ($debug);
+	print "pivoice.pl:\t\$action: $action" if ($debug);
 	
 	#print "pivoice.pl:\tAll vars found: ", ( $listen =~ /(\$\w*)?|(\@\w*)?/g ), "\n" if ($debug);
 	for ( $listen =~ /\$(\w*)?/g )
@@ -198,7 +243,7 @@ sub gen_regex_from_simple($$)
 		$mode = "array" if ( $varname =~ /^\_/ );
 		print "pivoice.pl:\tDetected mode is $mode\n" if ($debug);
 		
-		print "pivoice.pl:\tReplacing \$ vars\n" if ($debug);
+		print "pivoice.pl:\tReplacing \$ and \$_ vars\n" if ($debug);
 		print "pivoice.pl:\tFound varname \$$_\n" if ($debug);
 		print "pivoice.pl:\tCurrent action is $action\n" if ($debug);
 		
