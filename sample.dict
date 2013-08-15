@@ -4,7 +4,7 @@
 	ListenFor 	= play music
 	Action		= echo "<play music>"
 
-[playsong]
+[playssong]
 	ListenFor 	=~ play $song from @band
 	Action 		= echo "vlc /path/to/music/@band/$song.mp3"
 	

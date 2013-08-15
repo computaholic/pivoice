@@ -2,8 +2,10 @@
 
 [keyword]
 	ListenFor 	= Hello Pi
+	Action 		= !say 'Hallo, du hast gerufen.'
+	PlayTempo	= 1.50
 	
 [default]
 	MatchStyle 	= simple
-	Action 		= NONE
+	#Action 	= NONE
 
