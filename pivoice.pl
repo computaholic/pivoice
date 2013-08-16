@@ -161,7 +161,7 @@ for ( keys $dict_all{$scn_current} )
 			elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
 			{
 				$scn_next = $scn_all{$scn_current}{"NextScenario"};
-				last; # dont know if this works...
+				last; # dont know if this works... 
 			}
 			else
 			{
