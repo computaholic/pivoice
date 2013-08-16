@@ -142,45 +142,33 @@ for ( keys $dict_all{$scn_current} )
 			
 			# the $action string will be split up, then every part will 
 			# be expanded, then the variables will be replaced.
-			
-			print_debug( "Splitting, expansion and substitution in \$action: |$action|", $prog_name, $func_name, $deb_th, 0);
-			my @action_array = split(' ', $action); #need better split command
-			#my @action_array = split_action($action);
-			for ( @action_array )
-			{ 
-				# expand special expressions
-				$_ = expand_special_expression($_, $scn_current, $command, %scn_all, %dict_all);
-
-				# replace found variables
-				$_ =~ s/\$(\d+)/$match_list[($1-1)]/g;
-			}
-			print_debug( "\$action is now ", $prog_name, $func_name, $deb_th, 0);
-			print_debug( join(' ', @action_array), $prog_name, $func_name, $deb_th, 0);
+			$action = expand_special_expression($action, $scn_current, $command, %scn_all, %dict_all);
+			$action =~ s/\$(\d+)/$match_list[($1-1)]/g;
+			print_debug( "\$action is: |$action|", $prog_name, $func_name, $deb_th, 0);
 			
 			print_debug( "Action>>>>>>\n", $prog_name, $func_name, $deb_th, 0);
 			
 			# performing action
-			system(join(' ', @action_array));
-			
-			print_debug( " ", $prog_name, $func_name, $deb_th, 0);
-			print_debug( "Action<<<<<<", $prog_name, $func_name, $deb_th, 0);
+			system($action);
+			print_debug( "\n\t\tAction<<<<<<", $prog_name, $func_name, $deb_th, 0);
 			
 			# Next Scenario can be set per command or per scenario
 			if (defined $dict_all{$scn_current}{$_}{"NextScenario"} )
 			{
 				$scn_next = $dict_all{$scn_current}{$_}{"NextScenario"};
+				last;
 			}
 			elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
 			{
 				$scn_next = $scn_all{$scn_current}{"NextScenario"};
+				last;
 			}
 			else
 			{
 				print "Next scenario definition is missing\n";
 			}
 			print_debug( "Next scenario is $scn_next", $prog_name, $func_name, $deb_th, 0);
-			$scn_current = $scn_next;
-			last;
+			
 		} 
 		else
 		{
@@ -499,7 +487,7 @@ sub split_action($)
 # ----------------------------------------------------------------------
 sub print_debug($$$$$)
 {
-	exit 0 unless ( $debug );
+	return 0 unless ( $debug );
 	
 	my $msg				= shift;
 	my $prog_name			= shift;
