@@ -1,39 +1,56 @@
 #!/usr/bin/perl
 
+
+########################################################################
+###     STANDARD MODULES                                             
+########################################################################
+
 use warnings;
 use strict;
 use Config::IniFiles;
 
 
-# ----------------------------------------------------------------------
-# config variables
+########################################################################
+###     CONFIG VARIABLES                                             
 # 
 # scenarios and dictionaries are organised in hashes
 # these are tied hashes, so referencing will not work...I tried.
-# ----------------------------------------------------------------------
-my %scn_all;				# all available scenarios
+#
+########################################################################
 
-my $scn_default="default";# default scenario which provides parameter 
-							# values, if not present in other scenario
+my %scn_all;						# all available scenarios
+
+my $scn_default="default";		# default scenario which provides parameter 
+									# values, if not present in other scenario
 
 my $command_default="default"; 	# default command in dictionary
 
-my $scn_start;				# starting scenario, [*scenario] 
-my $scn_current;			# current scenario
+my $scn_start;						# starting scenario, [*scenario] 
+my $scn_current;					# current scenario
 
-my %dict_all;				# hash of all dicts, sorted by scenario
+my %dict_all;						# hash of all dicts, sorted by scenario
 
 #my $command_current; 				# current command of current dictionary;
 									# current dict is a hash:
 									# $dict_all{$scn_current}
 
+########################################################################
+###     DEBUG CONFIG                                              
+# 
+# some variables that help to display debug msg (which is almost most
+# of the code)
+#
+########################################################################
+
 my $debug		= 1;				# debuglevel
-my $prog_name 	= "pivoice.pl";
+my $deb_th 	= 1;				# debug threshold for main
+my $prog_name 	= "pivoice.pl";		#
 my $func_name 	= "main";
-my $deb_th 	= 1;
-# ----------------------------------------------------------------------
-# Prototypes
-# ----------------------------------------------------------------------
+
+########################################################################
+###     Prototypes
+########################################################################
+
 sub expand_special_expression($$$\%\%);
 sub scenario_get_start(\%);
 sub dict_get_all(\%);
@@ -42,33 +59,32 @@ sub get_voice();
 sub split_action($);
 sub print_debug($$$$$);
 
+
 ########################################################################
+##
+###     main program
+##
 ########################################################################
 
-# ----------------------------------------------------------------------
-# ----------------------------------------------------------------------
-# main program
-# ----------------------------------------------------------------------
-# ----------------------------------------------------------------------
 print_debug("ENTERING $func_name", $prog_name, $func_name, 1, 1);
 
-# ----------------------------------------------------------------------
-# Loading config and dictionaries
-# ----------------------------------------------------------------------
+########################################################################
+###     Loading config file and dictionaries
+########################################################################
 
 # loading config into tied hash scn_all
 tie %scn_all, 'Config::IniFiles', ( -file => "./pivoice.conf", -default => $scn_default );
-print_debug("Loading config file successfull", $prog_name, $func_name, 1, 0);
+print_debug("Loading config file successfull", $prog_name, $func_name, $deb_th, 0);
 
 # %dict_all is a hash of hashes (one for each scenario)
 # these are also hashes of hashes (one for each command)
 %dict_all = dict_get_all(%scn_all);
-print_debug("Loading dictionaries successfull", $prog_name, $func_name, 1, 0);
+print_debug("Loading dictionaries successfull", $prog_name, $func_name, $deb_th, 0);
 
 
-# ----------------------------------------------------------------------
-# Setting up starting conditions
-# ----------------------------------------------------------------------
+########################################################################
+###     Setting up starting conditions
+########################################################################
 
 # find the starting scenario that starts with *
 $scn_start = scenario_get_start(%scn_all);
@@ -79,136 +95,121 @@ $scn_current=$scn_start;
 #~~~~ test ~~~~~# 
 #my $test = expand_special_expression("!say", $scn_start, "playsong", %scn_all, %dict_all);
 #~~~~ test ~~~~~#
-print keys $dict_all{$scn_current};
+
+
 my $INPUT = get_voice();
 
-# ----------------------------------------------------------------------
-# Main Loop
-# ----------------------------------------------------------------------
+########################################################################
+###     Main Loop
+########################################################################
 
 # going over all commands that are in the dict of current scenario
-for ( keys $dict_all{$scn_current} )
+FL_COMMANDS: for ( keys $dict_all{$scn_current} )
 {
-	print_debug( "Current scenario is $scn_current", $prog_name, $func_name, $deb_th, 0);
-	# now $_ holds the current command, but	
-	# we do not care for the default command
-	if ( $_ ne $command_default )
+	# looping over all commands	except in $comman_default
+
+	# skipping default command
+	next FL_COMMANDS if ( $_ eq $command_default );
+	
+	#TODO Weiter code aufräumen
+	
+	# setting important vairiables
+	my $command 		= $_;												# current command
+	my $listen			= $dict_all{$scn_current}{$_}{"ListenFor"};		# matching string, what we listen for
+	my $matchstyle 	= $dict_all{$scn_current}{$_}{"MatchStyle"}; 	# matching style (simple|regex)
+	my $action 		= $dict_all{$scn_current}{$_}{"Action"};			# action to do
+	my $scn_next;															# Next Scenario
+	
+	print_debug( "Checking command <$command> with <$listen>", $prog_name, $func_name, $deb_th, 0);
+	
+	# lets check the MatchStyle (this is an ifthenelse-war, but perl
+	# does not consistently support switch statements)
+	
+	print_debug( "Match Type for command $command is $matchstyle", $prog_name, $func_name, $deb_th, 0);
+	
+	if ( $matchstyle eq "simple" )
 	{
-		my $command 		= $_;												# current command
-		my $listen			= $dict_all{$scn_current}{$_}{"ListenFor"};		# matching string, what we listen for
-		my $matchstyle 	= $dict_all{$scn_current}{$_}{"MatchStyle"}; 	# matching style (simple|regex)
-		my $action 		= $dict_all{$scn_current}{$_}{"Action"};			# action to do
-		my $scn_next;															# Next Scenario
+		# generate regex from simple string
+		($listen, $action) = gen_regex_from_simple($listen, $action);
 		
-		print_debug( "Checking command <$command> with <$listen>", $prog_name, $func_name, $deb_th, 0);
-		
-		# lets check the MatchStyle (this is an ifthenelse-war, but perl
-		# does not consistently support switch statements)
-		
-		print_debug( "Match Type for command $command is $matchstyle", $prog_name, $func_name, $deb_th, 0);
-		
-		if ( $matchstyle eq "simple" )
-		{
-			# generate regex from simple string
-			($listen, $action) = gen_regex_from_simple($listen, $action);
-			
-			# now put that regex back in and change MatchType, so we 
-			# dont have to do that again
-			$dict_all{$scn_current}{$command}{"ListenFor"} 	= $listen;
-			$dict_all{$scn_current}{$command}{"Action"} 	= $action;
-			$dict_all{$scn_current}{$command}{"MatchStyle"}	= "regex";
-		}
-		
-		# matching regex against $INPUT
-		if ( $INPUT =~ /$listen/ )
-		{
-			# ================================ #
-			# This gets executed if we have a  #
-			# match, just if you didnt notice  #
-			# ================================ #
-			
-			# get a list of variables in $INPUT
-			my  @match_list = ( $INPUT =~ /$listen/ );
-			
-			# DEBUG
-			print_debug( "Voice command |$INPUT| matches $listen", $prog_name, $func_name, $deb_th, 0);
-			my $count = scalar @match_list;
-			print_debug( "Command has $count parameters: ", $prog_name, $func_name, $deb_th, 0);
-			for ( @match_list )
-			{
-				print_debug( "$_ ", $prog_name, $func_name, $deb_th, 0);
-			}
-			# DEBUG END
-			
-			# the $action string will be split up, then every part will 
-			# be expanded, then the variables will be replaced.
-			$action = expand_special_expression($action, $scn_current, $command, %scn_all, %dict_all);
-			$action =~ s/\$(\d+)/$match_list[($1-1)]/g;
-			print_debug( "\$action is: |$action|", $prog_name, $func_name, $deb_th, 0);
-			
-			print_debug( "Action>>>>>>\n", $prog_name, $func_name, $deb_th, 0);
-			
-			# performing action
-			system($action);
-			print_debug( "\n\t\tAction<<<<<<", $prog_name, $func_name, $deb_th, 0);
-			
-			# Next Scenario can be set per command or per scenario
-			if (defined $dict_all{$scn_current}{$_}{"NextScenario"} )
-			{
-				$scn_next = $dict_all{$scn_current}{$_}{"NextScenario"};
-				last; # dont know if this works...
-			}
-			elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
-			{
-				$scn_next = $scn_all{$scn_current}{"NextScenario"};
-				last; # dont know if this works... 
-			}
-			else
-			{
-				print "Next scenario definition is missing\n";
-			}
-			print_debug( "Next scenario is $scn_next", $prog_name, $func_name, $deb_th, 0);
-			
-		} 
-		else
-		{
-			print_debug( "Voice command |$INPUT| does not match |$listen|\n", $prog_name, $func_name, $deb_th, 0);
-		}
-	}
-	else
-	{
-		print_debug( "Skipping command |$_|", $prog_name, $func_name, $deb_th, 0);
+		# now put that regex back in and change MatchType, so we 
+		# dont have to do that again
+		$dict_all{$scn_current}{$command}{"ListenFor"} 	= $listen;
+		$dict_all{$scn_current}{$command}{"Action"} 	= $action;
+		$dict_all{$scn_current}{$command}{"MatchStyle"}	= "regex";
 	}
 	
+	# matching regex against $INPUT
+	if ( $INPUT =~ /$listen/ )
+	{
+		# ================================ #
+		# This gets executed if we have a  #
+		# match, just if you didnt notice  #
+		# ================================ #
+		
+		# get a list of variables in $INPUT
+		my  @match_list = ( $INPUT =~ /$listen/ );
+		
+		# DEBUG
+		print_debug( "Voice command |$INPUT| matches $listen", $prog_name, $func_name, $deb_th, 0);
+		my $count = scalar @match_list;
+		print_debug( "Command has $count parameters: ", $prog_name, $func_name, $deb_th, 0);
+		for ( @match_list )
+		{
+			print_debug( "$_ ", $prog_name, $func_name, $deb_th, 0);
+		}
+		# DEBUG END
+		
+		# the $action string will be split up, then every part will 
+		# be expanded, then the variables will be replaced.
+		$action = expand_special_expression($action, $scn_current, $command, %scn_all, %dict_all);
+		$action =~ s/\$(\d+)/$match_list[($1-1)]/g;
+		print_debug( "\$action is: |$action|", $prog_name, $func_name, $deb_th, 0);
+		
+		print_debug( "Action>>>>>>\n", $prog_name, $func_name, $deb_th, 0);
+		
+		# performing action
+		system($action);
+		print_debug( "\n\t\tAction<<<<<<", $prog_name, $func_name, $deb_th, 0);
+		
+		# Next Scenario can be set per command or per scenario
+		# If NetScenario is found, leave loop over all commands
+		if (defined $dict_all{$scn_current}{$_}{"NextScenario"} )
+		{
+			$scn_next = $dict_all{$scn_current}{$_}{"NextScenario"};
+			last FL_COMMANDS;
+		}
+		elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
+		{
+			$scn_next = $scn_all{$scn_current}{"NextScenario"};
+			last FL_COMMANDS; 
+		}
+		else
+		{
+			print "Next scenario definition is missing\n";
+		}
+		print_debug( "Next scenario is $scn_next", $prog_name, $func_name, $deb_th, 0);
+		
+	} 
+	else
+	{
+		print_debug( "Voice command |$INPUT| does not match |$listen|\n", $prog_name, $func_name, $deb_th, 0);
+	}
+
 }
 
 print_debug( "LEAVING $func_name", $prog_name, $func_name, $deb_th, 0);
+
+
 ########################################################################
+###     function definitions
 ########################################################################
 
-# ----------------------------------------------------------------------
-# ----------------------------------------------------------------------
-# function definitions
-# ----------------------------------------------------------------------
-# ----------------------------------------------------------------------
-
-# ----------------------------------------------------------------------
-# expanding !.. expressions
-# ----------------------------------------------------------------------
 sub expand_special_expression($$$\%\%)
 {
-	# ~
-	my $func_name = "expand_special_expression";
-	my $deb_th 	= 1;
-	print_debug( "ENTERING $func_name", $prog_name, $func_name, $deb_th, 1);
-	# ~
-	
-	my $exp				= shift;	# !expression
-	my $current_scenario	= shift;	# current scenario
-	my $current_command	= shift;
-	my $scenarios 			= shift;	# hash with all scenarios
-	my $dicts				= shift;	# hash with all dicts
-	
+	# ------------------------------------------------------------------
+	# expanding !.. expressions
+	#
 	# expansion is done in following steps
 	# while($command has !expressions)
 	# 1. expand by definition in current command, if not defined then
@@ -220,12 +221,26 @@ sub expand_special_expression($$$\%\%)
 	# We will only need to do 1. and 3., because the used config module
 	# will automatically check for the default value if not given in 
 	# current (see tie %.. command)
+	# ------------------------------------------------------------------
+
+	# ~
+	my $func_name = "expand_special_expression";
+	my $deb_th 	= 2;
+	print_debug( "ENTERING $func_name", $prog_name, $func_name, $deb_th, 1);
+	# ~
+	
+	my $exp				= shift;	# !expression
+	my $current_scenario	= shift;	# current scenario
+	my $current_command	= shift;
+	my $scenarios 			= shift;	# hash with all scenarios
+	my $dicts				= shift;	# hash with all dicts
 	
 	print_debug( "Expanding expression |$exp|", $prog_name, $func_name, $deb_th, 0);
 	print_debug( "Current scenario is |$current_scenario|", $prog_name, $func_name, $deb_th, 0);
 	print_debug( "Current command is |$current_command|", $prog_name, $func_name, $deb_th, 0);
 	
 	
+	# as long as special expressions are found ...
 	while ( $exp =~ /\!(\w+)/ )
 	{
 		print_debug( "Expression |$exp| is a special command", $prog_name, $func_name, $deb_th, 0);
@@ -255,11 +270,11 @@ sub expand_special_expression($$$\%\%)
 	return $exp;
 }
 
-# ----------------------------------------------------------------------
-# generating regex from simple string
-# ----------------------------------------------------------------------
 sub gen_regex_from_simple($$)
 {
+	# ------------------------------------------------------------------
+	# generating regex from simple string
+	#
 	# simple means, absulute match.
 	# we convert that into a regex and proceed
 	# regex is /regex/, b/c we cant put '/' in a string
@@ -272,7 +287,8 @@ sub gen_regex_from_simple($$)
 	#
 	# ListenFor = google @all
 	# Action    = script_to_google "@all"
-	
+	# ------------------------------------------------------------------
+
 	# ~
 	my $func_name = "gen_regex_from_simple";
 	my $deb_th 	= 1;
@@ -353,11 +369,12 @@ sub gen_regex_from_simple($$)
 	return ($listen, $action);
 }
 
-# ----------------------------------------------------------------------
-# loading all dictionaries into one hash
-# ----------------------------------------------------------------------
 sub dict_get_all(\%)
 {
+	# ------------------------------------------------------------------
+	# loading all dictionaries into one hash
+	# ------------------------------------------------------------------
+
 	# ~
 	my $func_name = "dict_get_all";
 	my $deb_th = 1;
@@ -393,11 +410,12 @@ sub dict_get_all(\%)
 	return %dict_all;
 }
 
-# ----------------------------------------------------------------------
-# this will return the starting scenario
-# ----------------------------------------------------------------------
 sub scenario_get_start(\%)
 {
+	# ------------------------------------------------------------------
+	# this will return the starting scenario
+	# ------------------------------------------------------------------
+
 	# ~
 	my $func_name = "scenario_get_start";
 	my $deb_th = 1;
@@ -422,11 +440,12 @@ sub scenario_get_start(\%)
 	return 1; 
 }
 
-# ----------------------------------------------------------------------
-# turn the mic on and get started:)
-# ----------------------------------------------------------------------
 sub get_voice()
 {
+	# ------------------------------------------------------------------
+	# turn the mic on and get started:)
+	# ------------------------------------------------------------------
+
 	my $voice_string;
 	
 	# ~
@@ -447,46 +466,12 @@ sub get_voice()
 	return $voice_string;
 }
 
-# ----------------------------------------------------------------------
-# splitting action into right arrays
-# ----------------------------------------------------------------------
-sub split_action($)
-{
-	#~ # Basically, we need to seperate !subs and ".." and '..' strings
-	#~ my $tmp_action = shift;
-	#~ my @tmp_array;
-	#~ my @action_array;
-	#~ 
-	#~ # seperate by !subs
-	#~ while ( $tmp_action =~ /\!(\w+)/ )
-	#~ {
-		#~ @tmp_array 		= ( $tmp_action =~ /^(.*)?(\!\w+)(.*)$/ );
-		#~ push(@action_array, $tmp_array[1]) if ( $tmp_array(1) ne  "" );
-		#~ push(@action_array, $tmp_array[2]) if ( $tmp_array(3) ne  "" );
-		#~ push(@action_array, $tmp_array[3]) if ( $tmp_array(3) ne  "" );
-		#~ 
-		#~ $tmp_action 	= $tmp_array[3];
-	#~ }
-	#~ 
-	#~ # seperate by " "
-	#~ while ( $tmp_action =~ /\"(\w+)\"/ )
-	#~ {
-		#~ @tmp_array 		= ( $tmp_action =~ /^(.*)?(\"\w+\")(.*)$/ );
-		#~ push(@action_array, $tmp_array[1]) if ( $tmp_array(1) ne  "" );
-		#~ push(@action_array, $tmp_array[2]) if ( $tmp_array(3) ne  "" );
-		#~ push(@action_array, $tmp_array[3]) if ( $tmp_array(3) ne  "" );
-		#~ 
-		#~ $tmp_action 	= $tmp_array[3];
-	#~ }
-	#~ 
-	#~ return @tmp_array;
-}
-
-# ----------------------------------------------------------------------
-# printing debug messages
-# ----------------------------------------------------------------------
 sub print_debug($$$$$)
 {
+	# ------------------------------------------------------------------
+	# printing debug messages
+	# ------------------------------------------------------------------
+
 	return 0 unless ( $debug );
 	
 	my $msg				= shift;
@@ -507,5 +492,3 @@ sub print_debug($$$$$)
 		}
 	}
 }
-
-
