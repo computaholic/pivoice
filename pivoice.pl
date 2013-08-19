@@ -27,8 +27,12 @@ my $command_default="default"; 	# default command in dictionary
 
 my $scn_start;						# starting scenario, [*scenario] 
 my $scn_current;					# current scenario
+my $scn_next;						# Next Scenario
 
 my %dict_all;						# hash of all dicts, sorted by scenario
+
+my $INPUT="";						# Input from Speech to Text
+my $ismatch = 0;					# set if match was found
 
 #my $command_current; 				# current command of current dictionary;
 									# current dict is a hash:
@@ -92,111 +96,122 @@ $scn_start = scenario_get_start(%scn_all);
 # set current scenario to start scenario
 $scn_current=$scn_start;
 
-#~~~~ test ~~~~~# 
-#my $test = expand_special_expression("!say", $scn_start, "playsong", %scn_all, %dict_all);
-#~~~~ test ~~~~~#
-
-
-my $INPUT = get_voice();
+# set the scn_next also to scn start, this helps to get a valid state for this variable
+$scn_next=$scn_start;
 
 ########################################################################
 ###     Main Loop
 ########################################################################
 
-# going over all commands that are in the dict of current scenario
-FL_COMMANDS: for ( keys $dict_all{$scn_current} )
+while ( $scn_next ne "NONE" )
 {
-	# looping over all commands	except in $comman_default
+	# speech to text
+	my $INPUT = get_voice();
+	
+	# going over all commands that are in the dict of current scenario
+	FL_COMMANDS: for ( keys $dict_all{$scn_current} )
+	{
+		# looping over all commands	except in $comman_default
 
-	# skipping default command
-	next FL_COMMANDS if ( $_ eq $command_default );
-	
-	#TODO Weiter code aufräumen
-	
-	# setting important vairiables
-	my $command 		= $_;												# current command
-	my $listen			= $dict_all{$scn_current}{$_}{"ListenFor"};		# matching string, what we listen for
-	my $matchstyle 	= $dict_all{$scn_current}{$_}{"MatchStyle"}; 	# matching style (simple|regex)
-	my $action 		= $dict_all{$scn_current}{$_}{"Action"};			# action to do
-	my $scn_next;															# Next Scenario
-	
-	print_debug( "Checking command <$command> with <$listen>", $prog_name, $func_name, $deb_th, 0);
-	
-	# lets check the MatchStyle (this is an ifthenelse-war, but perl
-	# does not consistently support switch statements)
-	
-	print_debug( "Match Type for command $command is $matchstyle", $prog_name, $func_name, $deb_th, 0);
-	
-	if ( $matchstyle eq "simple" )
-	{
-		# generate regex from simple string
-		($listen, $action) = gen_regex_from_simple($listen, $action);
+		# skipping default command, fallback command coming soon
+		next FL_COMMANDS if ( $_ eq $command_default );
 		
-		# now put that regex back in and change MatchType, so we 
-		# dont have to do that again
-		$dict_all{$scn_current}{$command}{"ListenFor"} 	= $listen;
-		$dict_all{$scn_current}{$command}{"Action"} 	= $action;
-		$dict_all{$scn_current}{$command}{"MatchStyle"}	= "regex";
-	}
-	
-	# matching regex against $INPUT
-	if ( $INPUT =~ /$listen/ )
-	{
-		# ================================ #
-		# This gets executed if we have a  #
-		# match, just if you didnt notice  #
-		# ================================ #
+		#TODO Weiter code aufräumen
 		
-		# get a list of variables in $INPUT
-		my  @match_list = ( $INPUT =~ /$listen/ );
+		# setting important vairiables
+		my $command 		= $_;												# current command
+		my $listen			= $dict_all{$scn_current}{$_}{"ListenFor"};		# matching string, what we listen for
+		my $matchstyle 	= $dict_all{$scn_current}{$_}{"MatchStyle"}; 	# matching style (simple|regex)
+		my $action 		= $dict_all{$scn_current}{$_}{"Action"};			# action to do
 		
-		# DEBUG
-		print_debug( "Voice command |$INPUT| matches $listen", $prog_name, $func_name, $deb_th, 0);
-		my $count = scalar @match_list;
-		print_debug( "Command has $count parameters: ", $prog_name, $func_name, $deb_th, 0);
-		for ( @match_list )
+		print_debug( "LOOP: FL_COMMANDS", $prog_name, $func_name, $deb_th, 0);
+		print_debug( "\$command:\t|$command|", $prog_name, $func_name, $deb_th, 0);
+		print_debug( "\$listen:\t|$listen|", $prog_name, $func_name, $deb_th, 0);
+		print_debug( "\$matchstyle:\t|$matchstyle|", $prog_name, $func_name, $deb_th, 0);
+		print_debug( "\$action:\t|$action|", $prog_name, $func_name, $deb_th, 0);
+		
+		
+		# lets check the MatchStyle (this is an ifthenelse-war, but perl
+		# does not consistently support switch statements)	
+		if ( $matchstyle eq "simple" )
 		{
-			print_debug( "$_ ", $prog_name, $func_name, $deb_th, 0);
+			# generate regex from simple string
+			($listen, $action) = gen_regex_from_simple($listen, $action);
+			
+			# now put that regex back in and change MatchType, so we 
+			# dont have to do that again
+			$dict_all{$scn_current}{$command}{"ListenFor"} 	= $listen;
+			$dict_all{$scn_current}{$command}{"Action"} 	= $action;
+			$dict_all{$scn_current}{$command}{"MatchStyle"}	= "regex";
 		}
-		# DEBUG END
 		
-		# the $action string will be split up, then every part will 
-		# be expanded, then the variables will be replaced.
-		$action = expand_special_expression($action, $scn_current, $command, %scn_all, %dict_all);
-		$action =~ s/\$(\d+)/$match_list[($1-1)]/g;
-		print_debug( "\$action is: |$action|", $prog_name, $func_name, $deb_th, 0);
-		
-		print_debug( "Action>>>>>>\n", $prog_name, $func_name, $deb_th, 0);
-		
-		# performing action
-		system($action);
-		print_debug( "\n\t\tAction<<<<<<", $prog_name, $func_name, $deb_th, 0);
-		
-		# Next Scenario can be set per command or per scenario
-		# If NetScenario is found, leave loop over all commands
-		if (defined $dict_all{$scn_current}{$_}{"NextScenario"} )
+		# matching regex against $INPUT
+		if ( $INPUT =~ /$listen/ )
 		{
-			$scn_next = $dict_all{$scn_current}{$_}{"NextScenario"};
-			last FL_COMMANDS;
-		}
-		elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
-		{
-			$scn_next = $scn_all{$scn_current}{"NextScenario"};
-			last FL_COMMANDS; 
-		}
+			# ================================ #
+			# This gets executed if we have a  #
+			# match, just if you didnt notice  #
+			# ================================ #
+			print_debug( "Voice command |$INPUT| matches $listen", $prog_name, $func_name, $deb_th, 0);
+			$ismatch = 1;
+			
+			# get a list of variables in $INPUT
+			my  @match_list = ( $INPUT =~ /$listen/ );		
+			my $count = scalar @match_list;
+			print_debug( "Command has $count parameters: ", $prog_name, $func_name, $deb_th, 0);
+			print_debug( "$_ ", $prog_name, $func_name, $deb_th, 0) for ( @match_list );
+			
+			
+			# $action will be expanded ('!' vars) and '$' will be replaced
+			$action = expand_special_expression($action, $scn_current, $command, %scn_all, %dict_all);
+			print_debug( "expanded \$action: |$action|", $prog_name, $func_name, $deb_th, 0);
+			
+			$action =~ s/\$(\d+)/$match_list[($1-1)]/g;
+			print_debug( "replaced \$action: |$action|", $prog_name, $func_name, $deb_th, 0);
+			
+			
+			# performing action
+			print_debug( "Action>>>>>>\n", $prog_name, $func_name, $deb_th, 0);
+			system($action);
+			print_debug( "\n\t\tAction<<<<<<", $prog_name, $func_name, $deb_th, 0);
+			
+			# Next Scenario can be set per command or per scenario
+			# If NetScenario is found, leave loop over all commands
+			if (defined $dict_all{$scn_current}{$_}{"NextScenario"} )
+			{
+				$scn_next = $dict_all{$scn_current}{$_}{"NextScenario"};
+				print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
+				last FL_COMMANDS;
+			}
+			elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
+			{
+				$scn_next = $scn_all{$scn_current}{"NextScenario"};
+				print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
+				last FL_COMMANDS; 
+			}
+			else
+			{
+				print_debug( "Next scenario definition is missing", $prog_name, $func_name, $deb_th, 0);
+			}
+			
+		} 
 		else
 		{
-			print "Next scenario definition is missing\n";
+			print_debug( "Voice command |$INPUT| does not match |$listen|\n", $prog_name, $func_name, $deb_th, 0);
 		}
-		print_debug( "Next scenario is $scn_next", $prog_name, $func_name, $deb_th, 0);
-		
-	} 
-	else
-	{
-		print_debug( "Voice command |$INPUT| does not match |$listen|\n", $prog_name, $func_name, $deb_th, 0);
-	}
 
-}
+	} # FL_COMMANDS
+	
+	print_debug( "Finished FL_COMMANDS\n", $prog_name, $func_name, $deb_th, 0);
+	
+	# if match was found, proceed to NextScenario, else to Start Scenario
+	# this should be optional, TODO
+	$scn_current = $scn_next if ( $ismatch );
+	$scn_current = $scn_start if ( not $ismatch );
+	
+	# reset match varliable
+	$ismatch = 0;
+} # while
 
 print_debug( "LEAVING $func_name", $prog_name, $func_name, $deb_th, 0);
 
@@ -291,15 +306,15 @@ sub gen_regex_from_simple($$)
 
 	# ~
 	my $func_name = "gen_regex_from_simple";
-	my $deb_th 	= 1;
+	my $deb_th 	= 2;
 	print_debug( "ENTERING $func_name", $prog_name, $func_name, $deb_th, 1);
 	# ~
 	
 	my $listen = shift;
 	my $action = shift;
 	
-	print_debug( "\$listen: $listen", $prog_name, $func_name, $deb_th, 0);
-	print_debug( "\$action: $action", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "\$listen: |$listen|", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "\$action: |$action|", $prog_name, $func_name, $deb_th, 0);
 	
 	# cleaning up the listen words
 	chomp($listen);
@@ -329,26 +344,25 @@ sub gen_regex_from_simple($$)
 		$mode = "scalar" if ( $varname =~ /^[^\_]/ );
 		$mode = "array" if ( $varname =~ /^\_/ );
 		print_debug( "Detected mode is $mode", $prog_name, $func_name, $deb_th, 0);
-		print_debug( "Replacing \$ and \$_ vars", $prog_name, $func_name, $deb_th, 0);
 		print_debug( "Found varname \$$_", $prog_name, $func_name, $deb_th, 0);
-		print_debug( "Current action is $action", $prog_name, $func_name, $deb_th, 0);
 		
 		# replace varnames in $action to $1, $2... 
 		$action =~ s/(\$$varname)/\$$counter/g;
 		
-		print_debug( "New action is $action", $prog_name, $func_name, $deb_th, 0);
-		
 		# counting one up, so we know what ${num} ($1, $2,...} is
 		$counter++;
 	}
+	print_debug( "New action is $action", $prog_name, $func_name, $deb_th, 0);
 	
 	
 	# after replacing varnames in $action we gen. regex in $listen
+	print_debug( "replace scalar vars", $prog_name, $func_name, $deb_th, 0);
 	$listen =~ s/\$[^_](\w+)?/\(\\w\+\)\?/g;
-	print_debug( "regex 1st run: $listen", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "\$listen:\t$listen", $prog_name, $func_name, $deb_th, 0);
 	
+	print_debug( "replace array vars", $prog_name, $func_name, $deb_th, 0);
 	$listen =~ s/\$[\_](\w+)?/\(\.\+\)\?/g;
-	print_debug( "regex 2nd run: $listen", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "\$listen:\t$listen", $prog_name, $func_name, $deb_th, 0);
 	
 	# checking for absolute or non absulte match
 	if ( ($listen =~ /^~/) )
@@ -362,9 +376,11 @@ sub gen_regex_from_simple($$)
 		$listen = "^$listen\$";
 	}
 	
-	print_debug( "Generated regex $listen", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "Generated regex", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "\$listen: $listen", $prog_name, $func_name, $deb_th, 0);
+	print_debug( "\$action: $action", $prog_name, $func_name, $deb_th, 0);
 	
-	
+	# returning $listen and $action
 	print_debug( "LEAVING $func_name", $prog_name, $func_name, $deb_th, 0);
 	return ($listen, $action);
 }
@@ -377,7 +393,7 @@ sub dict_get_all(\%)
 
 	# ~
 	my $func_name = "dict_get_all";
-	my $deb_th = 1;
+	my $deb_th = 2;
 	# ~
 	print_debug( "ENTERING $func_name", $prog_name, $func_name, $deb_th, 1);
 	
@@ -418,7 +434,7 @@ sub scenario_get_start(\%)
 
 	# ~
 	my $func_name = "scenario_get_start";
-	my $deb_th = 1;
+	my $deb_th = 2;
 	# ~
 	
 	print_debug( "ENTERING $func_name", $prog_name, $func_name, $deb_th, 1);
@@ -450,7 +466,7 @@ sub get_voice()
 	
 	# ~
 	my $func_name = "scenario_get_start";
-	my $deb_th = 1;
+	my $deb_th = 2;
 	# ~
 	
 	# For now we will fake an input string
