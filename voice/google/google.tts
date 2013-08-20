@@ -16,6 +16,8 @@ lang="en"		# default language
 usecache=0 		# default caching behavior
 stringset=0 	# temp var to get some commandline errors
 tempo="1.00"	# playback tempo
+driver="alsa"	# default sound driver
+hwaddr="hw:0"	# default hw device
 
 # this has been added to evaluate time difference with -cache option
 if [ $debuglevel -gt 0 ]; then
@@ -42,6 +44,16 @@ do
 		tempo=$1
 		shift
 	;;
+	"-d")
+		shift
+		driver=$1
+		shift
+	;;
+	"-h")
+		shift
+		hwaddr=$1
+		shift
+	;;
 	*) # this should be the string
 		if [ $stringset -eq 1 ]; then
 			echo "ERROR: unknown option or something else is wrong"
@@ -54,6 +66,10 @@ do
 	;;
 	esac
 done
+
+# setting sound options
+export AUDIODRIVER=$driver
+export AUDIODEV=$hwaddr
 
 # Caching: String+language gets md5 hash. If this hash exists, then echo file
 # right away. This gives about 100ms faster ouptut

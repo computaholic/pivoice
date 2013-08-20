@@ -33,6 +33,8 @@ my %dict_all;						# hash of all dicts, sorted by scenario
 
 my $INPUT="";						# Input from Speech to Text
 my $ismatch = 0;					# set if match was found
+my $nomatchmode="";				# what to do if no match was found
+my $nextscenariomode="";			# what to do if no NextScenario is defined
 
 #my $command_current; 				# current command of current dictionary;
 									# current dict is a hash:
@@ -103,10 +105,14 @@ $scn_next=$scn_start;
 ###     Main Loop
 ########################################################################
 
-while ( $scn_next ne "NONE" )
+while ( $scn_current ne "NONE" )
 {
+	# setting scenario dependent variables
+	$nomatchmode			= $scn_all{$scn_current}{"NoMatchMode"};
+	$nextscenariomode		= $scn_all{$scn_current}{"NextScenarioMode"};
+	
 	# speech to text
-	my $INPUT = get_voice();
+	my $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
 	
 	# going over all commands that are in the dict of current scenario
 	FL_COMMANDS: for ( keys $dict_all{$scn_current} )
@@ -145,6 +151,7 @@ while ( $scn_next ne "NONE" )
 			$dict_all{$scn_current}{$command}{"MatchStyle"}	= "regex";
 		}
 		
+		
 		# matching regex against $INPUT
 		if ( $INPUT =~ /$listen/ )
 		{
@@ -152,19 +159,19 @@ while ( $scn_next ne "NONE" )
 			# This gets executed if we have a  #
 			# match, just if you didnt notice  #
 			# ================================ #
+			
 			print_debug( "Voice command |$INPUT| matches $listen", $prog_name, $func_name, $deb_th, 0);
 			$ismatch = 1;
 			
-			# get a list of variables in $INPUT
+			
+			# get a list of variables in $INPUT, if none are there, nothing will happen
 			my  @match_list = ( $INPUT =~ /$listen/ );		
-			my $count = scalar @match_list;
-			print_debug( "Command has $count parameters: ", $prog_name, $func_name, $deb_th, 0);
-			print_debug( "$_ ", $prog_name, $func_name, $deb_th, 0) for ( @match_list );
 			
 			
 			# $action will be expanded ('!' vars) and '$' will be replaced
 			$action = expand_special_expression($action, $scn_current, $command, %scn_all, %dict_all);
 			print_debug( "expanded \$action: |$action|", $prog_name, $func_name, $deb_th, 0);
+			
 			
 			$action =~ s/\$(\d+)/$match_list[($1-1)]/g;
 			print_debug( "replaced \$action: |$action|", $prog_name, $func_name, $deb_th, 0);
@@ -175,25 +182,29 @@ while ( $scn_next ne "NONE" )
 			system($action);
 			print_debug( "\n\t\tAction<<<<<<", $prog_name, $func_name, $deb_th, 0);
 			
+			
 			# Next Scenario can be set per command or per scenario
 			# If NetScenario is found, leave loop over all commands
 			if (defined $dict_all{$scn_current}{$_}{"NextScenario"} )
 			{
 				$scn_next = $dict_all{$scn_current}{$_}{"NextScenario"};
-				print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
 				last FL_COMMANDS;
 			}
 			elsif ( defined $scn_all{$scn_current}{"NextScenario"} )
 			{
 				$scn_next = $scn_all{$scn_current}{"NextScenario"};
-				print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
 				last FL_COMMANDS; 
 			}
 			else
 			{
 				print_debug( "Next scenario definition is missing", $prog_name, $func_name, $deb_th, 0);
+				print_debug( "\$nextscenariomode: $nextscenariomode", $prog_name, $func_name, $deb_th, 0);
+				
+				exit 0 if ( $nextscenariomode eq "QUIT" );
+				
+				# if NextScenarioMode is not set to QUIT, then start again
+				$scn_next = $scn_start;
 			}
-			
 		} 
 		else
 		{
@@ -202,15 +213,39 @@ while ( $scn_next ne "NONE" )
 
 	} # FL_COMMANDS
 	
-	print_debug( "Finished FL_COMMANDS\n", $prog_name, $func_name, $deb_th, 0);
+	# stating what has been found to be the next scenario
+	print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
 	
-	# if match was found, proceed to NextScenario, else to Start Scenario
-	# this should be optional, TODO
-	$scn_current = $scn_next if ( $ismatch );
-	$scn_current = $scn_start if ( not $ismatch );
+	
+	# if no match is found, then set $scn_next according to NoMatchMode
+	print_debug( "NoMatchMode is set to |$nomatchmode|", $prog_name, $func_name, $deb_th, 0);
+	if ( not $ismatch )
+	{
+		print_debug( "No Match has been found", $prog_name, $func_name, $deb_th, 0);
+		if ( $nomatchmode eq "START" )
+		{
+			$scn_next = $scn_start;
+		}
+		elsif ( $nomatchmode eq "STAY" )
+		{
+			#$scn_current = $scn_current;
+		}
+		else
+		{
+			print_debug( "NoMatchMode is set to |$nomatchmode| and not properly defined", $prog_name, $func_name, $deb_th, 0);
+		}
+	}
+	
+	
+	# stating what has been found to be the next scenario, again
+	print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
 	
 	# reset match varliable
 	$ismatch = 0;
+	
+	# finally setting current scenario to next scenario
+	$scn_current = $scn_next;
+
 } # while
 
 print_debug( "LEAVING $func_name", $prog_name, $func_name, $deb_th, 0);
