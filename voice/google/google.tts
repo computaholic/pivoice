@@ -16,8 +16,8 @@ lang="en"		# default language
 usecache=0 		# default caching behavior
 stringset=0 	# temp var to get some commandline errors
 tempo="1.00"	# playback tempo
-driver="alsa"	# default sound driver
-hwaddr="hw:0"	# default hw device
+driver=""		# default sound driver
+hwaddr=""		# default hw device
 
 # this has been added to evaluate time difference with -cache option
 if [ $debuglevel -gt 0 ]; then
@@ -68,8 +68,13 @@ do
 done
 
 # setting sound options
-export AUDIODRIVER=$driver
-export AUDIODEV=$hwaddr
+if [ $driver -ne "" ]; then
+	export AUDIODRIVER=$driver
+fi
+
+if [ $hwaddr -ne "" ]; then
+	export AUDIODEV=$hwaddr
+fi
 
 # Caching: String+language gets md5 hash. If this hash exists, then echo file
 # right away. This gives about 100ms faster ouptut
