@@ -68,11 +68,11 @@ do
 done
 
 # setting sound options
-if [ $driver -ne "" ]; then
+if [ "$driver" != "" ]; then
 	export AUDIODRIVER=$driver
 fi
 
-if [ $hwaddr -ne "" ]; then
+if [ "$hwaddr" != "" ]; then
 	export AUDIODEV=$hwaddr
 fi
 
