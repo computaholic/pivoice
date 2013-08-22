@@ -20,10 +20,10 @@ use Config::IniFiles;
 
 my %scn_all;						# all available scenarios
 
-my $scn_default="default";		# default scenario which provides parameter 
+my $scn_default			="default";	# default scenario which provides parameter 
 									# values, if not present in other scenario
 
-my $command_default="default"; 	# default command in dictionary
+my $command_default		="default"; # default command in dictionary
 
 my $scn_start;						# starting scenario, [*scenario] 
 my $scn_current;					# current scenario
@@ -31,10 +31,12 @@ my $scn_next;						# Next Scenario
 
 my %dict_all;						# hash of all dicts, sorted by scenario
 
-my $INPUT="";						# Input from Speech to Text
-my $ismatch = 0;					# set if match was found
-my $nomatchmode="";				# what to do if no match was found
-my $nextscenariomode="";			# what to do if no NextScenario is defined
+my $INPUT				="";		# Input from Speech to Text
+my $ismatch 			= 0;		# set if match was found
+my $nomatchmode			="";		# what to do if no match was found
+my $nextscenariomode	="";		# what to do if no NextScenario is defined
+
+my %global;							# global config hash for operating inter-scenario
 
 #my $command_current; 				# current command of current dictionary;
 									# current dict is a hash:
@@ -49,7 +51,7 @@ my $nextscenariomode="";			# what to do if no NextScenario is defined
 ########################################################################
 
 my $debug		= 1;				# debuglevel
-my $deb_th 	= 1;				# debug threshold for main
+my $deb_th 		= 1;				# debug threshold for main
 my $prog_name 	= "pivoice.pl";		#
 my $func_name 	= "main";
 
@@ -107,8 +109,8 @@ $scn_next=$scn_start;
 ########################################################################
 
 # creating per command vars 
-my $command 		= "";
-my $listen			= "";
+my $command 	= "";
+my $listen		= "";
 my $matchstyle	= "";
 my $action 		= "";
 
@@ -119,10 +121,10 @@ while ( $scn_current ne "NONE" )
 	$nextscenariomode		= $scn_all{$scn_current}{"NextScenarioMode"};
 	
 	# clearing per command variables 
-	$command 		= "";
+	$command 	= "";
 	$listen		= "";
 	$matchstyle	= "";
-	$action 		= "";
+	$action 	= "";
 	
 	# speech to text
 	my $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
