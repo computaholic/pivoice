@@ -20,10 +20,10 @@ use Config::IniFiles;
 
 my %scn_all;						# all available scenarios
 
-my $scn_default			="default";	# default scenario which provides parameter 
+my $scn_default		="default";	# default scenario which provides parameter 
 									# values, if not present in other scenario
 
-my $command_default		="default"; # default command in dictionary
+my $command_default	="default"; # default command in dictionary
 
 my $scn_start;						# starting scenario, [*scenario] 
 my $scn_current;					# current scenario
@@ -33,10 +33,13 @@ my %dict_all;						# hash of all dicts, sorted by scenario
 
 my $INPUT				="";		# Input from Speech to Text
 my $ismatch 			= 0;		# set if match was found
-my $nomatchmode			="";		# what to do if no match was found
+my $nomatchmode		="";		# what to do if no match was found
 my $nextscenariomode	="";		# what to do if no NextScenario is defined
 
-my %global;							# global config hash for operating inter-scenario
+my %global{	'container'	=> "",
+			'PassMode' 	=> ""};		# global config hash for operating inter-scenario
+			
+my $INPUT; 						
 
 #my $command_current; 				# current command of current dictionary;
 									# current dict is a hash:
@@ -64,7 +67,7 @@ sub expand_special_expression($$$\%\%);
 sub scenario_get_start(\%);
 sub dict_get_all(\%);
 sub gen_regex_from_simple($$);
-sub get_voice();
+sub get_voice($\%);
 sub split_action($);
 sub print_debug($$$$$);
 
@@ -109,8 +112,8 @@ $scn_next=$scn_start;
 ########################################################################
 
 # creating per command vars 
-my $command 	= "";
-my $listen		= "";
+my $command		= "";
+my $listen			= "";
 my $matchstyle	= "";
 my $action 		= "";
 
@@ -120,14 +123,31 @@ while ( $scn_current ne "NONE" )
 	$nomatchmode			= $scn_all{$scn_current}{"NoMatchMode"};
 	$nextscenariomode		= $scn_all{$scn_current}{"NextScenarioMode"};
 	
+		
 	# clearing per command variables 
 	$command 	= "";
 	$listen		= "";
 	$matchstyle	= "";
 	$action 	= "";
 	
-	# speech to text
-	my $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
+	# get input based on passmode
+	#~ if ( $global{"PassMode"} eq "straight" or $global{"PassMode"} eq "mercy" )
+	#~ {
+		#~ if ( $scn_all{$scn_current}{"Passing"} ne "" )
+		#~ {
+			#~ $INPUT = $scn_all{$scn_current}{"Passing"};
+		#~ }
+		#~ else
+		#~ {
+			#~ $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
+		#~ }
+	#~ }
+	#~ else
+	#~ {
+		#~ $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
+	#~ }
+	
+	$INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
 	
 	# going over all commands that are in the dict of current scenario
 	FL_COMMANDS: for ( keys $dict_all{$scn_current} )
@@ -222,6 +242,8 @@ while ( $scn_current ne "NONE" )
 	
 	# reset match varliable
 	$ismatch = 0;
+	
+	#$global{'PassMode'} = $scn_all{$scn_current}{'PassMode'} if  ( defined $scn_all{$scn_current}{'PassMode'} );
 	
 	# finally setting current scenario to next scenario
 	$scn_current = $scn_next;
@@ -540,28 +562,35 @@ sub scenario_get_start(\%)
 	return 1; 
 }
 
-sub get_voice()
+sub get_voice($\%)
 {
 	# ------------------------------------------------------------------
 	# turn the mic on and get started:)
 	# ------------------------------------------------------------------
 
+	my $scn_current 	= shift;
+	my $scn_all		= shift;
+
 	my $voice_string;
 	
 	# ~
-	my $func_name = "scenario_get_start";
+	my $func_name = "get_voice";
 	my $deb_th = 2;
 	# ~
 	
+	$rec = $$scn_all{$scn_current}{'rec'};
+	
+	$rec = expand_special_expression($rec, $scn_current, "", $$scn_all, {});
+	
 	# For now we will fake an input string
 	#my $INPUT="would you play wow from bANg and so on\n";
-	print "Enter INPUT: ";
-	$voice_string= <>;
+	#print "Enter INPUT: ";
+	$voice_string= `$rec`;
 
 	# now removing blanks at the beginning and the end
 	chomp ($voice_string);
-	$voice_string =~ s/^(( )*)?//;
-	$voice_string =~ s/( )*?$//;
+	#$voice_string =~ s/^(( )*)?//;
+	#$voice_string =~ s/( )*?$//;
 	
 	return $voice_string;
 }

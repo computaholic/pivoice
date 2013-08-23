@@ -1,9 +1,12 @@
 #!/bin/bash
 
-lang="en"
+lang="en"						# default language
+outmode=""						# default outmode
+soxmode="1 0.1 3% 1 0.4 1%"		# default sox rec config
 
 driver=""		# default sound driver
 hwaddr=""		# default hw device
+
 
 while (( "$#" )); 
 do
@@ -23,6 +26,16 @@ do
 		hwaddr=$1
 		shift
 	;;
+	"-m")
+		shift
+		outmode=$1
+		shift
+	;;
+	"-s")
+		shift
+		soxmode=$1
+		shift
+	;;
 	*) # unknown option
 		echo "Unknown option"
 		exit 1
@@ -39,8 +52,13 @@ if [ "$hwaddr" != "" ]; then
 	export AUDIODEV=$hwaddr
 fi
 
+# record audio
+rec -c 1 -r 16000 -t flac /dev/shm/out.flac silence -l $soxmode
 
-rec -c 1 -r 16000 -t flac /dev/shm/out.flac silence -l 1 0.1 3% 1 0.4 1%
-#wget -O - -o /dev/null --post-file /dev/shm/out.flac --header="Content-Type: audio/x-flac; rate=16000" http://www.google.com/speech-api/v1/recognize?lang="$lang" | sed -e 's/[{}]/''/g'| awk -v k="text" '{n=split($0,a,","); for (i=1; i<=n; i++) print a[i]; exit }' | awk -F: 'NR==3 { print $3; exit }'
+if [ "$outmode" == "json" ]; then
+	wget -O - -o /dev/null --post-file /dev/shm/out.flac --header="Content-Type: audio/x-flac; rate=16000" http://www.google.com/speech-api/v1/recognize?lang="$lang" | sed -e 's/[{}]/''/g'| awk -v k="text" '{n=split($0,a,","); for (i=1; i<=n; i++) print a[i]; exit }' | awk -F: 'NR==3 { print $3; exit }'
+else
+	wget -O - -o /dev/null --post-file /dev/shm/out.flac --header="Content-Type: audio/x-flac; rate=16000" http://www.google.com/speech-api/v1/recognize?lang="$lang" 
+fi
 
-wget -O - -o /dev/null --post-file /dev/shm/out.flac --header="Content-Type: audio/x-flac; rate=16000" http://www.google.com/speech-api/v1/recognize?lang="$lang" 
+#
