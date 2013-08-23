@@ -36,10 +36,10 @@ my $ismatch 			= 0;		# set if match was found
 my $nomatchmode		="";		# what to do if no match was found
 my $nextscenariomode	="";		# what to do if no NextScenario is defined
 
-my %global{	'container'	=> "",
-			'PassMode' 	=> ""};		# global config hash for operating inter-scenario
+my %global = (	'container'	=> "",
+			'PassMode' 	=> "");		# global config hash for operating inter-scenario
 			
-my $INPUT; 						
+
 
 #my $command_current; 				# current command of current dictionary;
 									# current dict is a hash:
@@ -53,7 +53,7 @@ my $INPUT;
 #
 ########################################################################
 
-my $debug		= 1;				# debuglevel
+my $debug		= 2;				# debuglevel
 my $deb_th 		= 1;				# debug threshold for main
 my $prog_name 	= "pivoice.pl";		#
 my $func_name 	= "main";
@@ -67,7 +67,7 @@ sub expand_special_expression($$$\%\%);
 sub scenario_get_start(\%);
 sub dict_get_all(\%);
 sub gen_regex_from_simple($$);
-sub get_voice($\%);
+sub get_voice($%);
 sub split_action($);
 sub print_debug($$$$$);
 
@@ -147,7 +147,11 @@ while ( $scn_current ne "NONE" )
 		#~ $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
 	#~ }
 	
-	$INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
+	#TODO: expand rec and get voicestring, probably make new expanding function
+	my $tmp = $scn_all{$scn_current}{"rec"};
+	print "$tmp";
+	$INPUT = <>;
+	$INPUT = get_voice($scn_current, %scn_all); # turn to get_voice($scn_current) when fully filled
 	
 	# going over all commands that are in the dict of current scenario
 	FL_COMMANDS: for ( keys $dict_all{$scn_current} )
@@ -562,25 +566,30 @@ sub scenario_get_start(\%)
 	return 1; 
 }
 
-sub get_voice($\%)
+sub get_voice($%)
 {
 	# ------------------------------------------------------------------
 	# turn the mic on and get started:)
 	# ------------------------------------------------------------------
 
 	my $scn_current 	= shift;
-	my $scn_all		= shift;
+	my %scn_all			= shift;
 
 	my $voice_string;
+	my $rec;
 	
 	# ~
 	my $func_name = "get_voice";
 	my $deb_th = 2;
 	# ~
+	print_debug( "ENTERING $func_name", $prog_name, $func_name, $deb_th, 1);
 	
-	$rec = $$scn_all{$scn_current}{'rec'};
+	$rec = $scn_all{$scn_current}{"rec"};
+	print_debug( "rec: $rec", $prog_name, $func_name, $deb_th, 0);
 	
-	$rec = expand_special_expression($rec, $scn_current, "", $$scn_all, {});
+	
+	$rec = expand_special_expression($rec, $scn_current, "", %scn_all, my %empty);
+	print_debug( "rec: $rec", $prog_name, $func_name, $deb_th, 0);
 	
 	# For now we will fake an input string
 	#my $INPUT="would you play wow from bANg and so on\n";
