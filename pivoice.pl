@@ -19,6 +19,7 @@ use Config::IniFiles;
 ########################################################################
 
 my %scn_all;						# all available scenarios
+									# also all dicts are in here
 
 my $scn_default		="default";	# default scenario which provides parameter 
 									# values, if not present in other scenario
@@ -62,7 +63,7 @@ my $func_name 	= "main";
 ###     Prototypes
 ########################################################################
 
-sub get_next_scenario($$$$$$\%\%);
+sub get_next_scenario($$$$\%);
 sub expand_special_expression($$$\%\%);
 sub scenario_get_start(\%);
 sub dict_get_all(\%);
@@ -90,9 +91,9 @@ print_debug("Loading config file successfull", $prog_name, $func_name, $deb_th, 
 
 # %dict_all is a hash of hashes (one for each scenario)
 # these are also hashes of hashes (one for each command)
-%dict_all = dict_get_all(%scn_all);
+#%dict_all = dict_get_all(%scn_all);
+dict_get_all(%scn_all);
 print_debug("Loading dictionaries successfull", $prog_name, $func_name, $deb_th, 0);
-
 
 ########################################################################
 ###     Setting up starting conditions
@@ -119,10 +120,6 @@ my $action 		= "";
 
 while ( $scn_current ne "NONE" )
 {
-	# setting scenario dependent variables
-	$nomatchmode			= $scn_all{$scn_current}{"NoMatchMode"};
-	$nextscenariomode		= $scn_all{$scn_current}{"NextScenarioMode"};
-	
 		
 	# clearing per command variables 
 	$command 	= "";
@@ -130,31 +127,16 @@ while ( $scn_current ne "NONE" )
 	$matchstyle	= "";
 	$action 	= "";
 	
-	# get input based on passmode
-	#~ if ( $global{"PassMode"} eq "straight" or $global{"PassMode"} eq "mercy" )
-	#~ {
-		#~ if ( $scn_all{$scn_current}{"Passing"} ne "" )
-		#~ {
-			#~ $INPUT = $scn_all{$scn_current}{"Passing"};
-		#~ }
-		#~ else
-		#~ {
-			#~ $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
-		#~ }
-	#~ }
-	#~ else
-	#~ {
-		#~ $INPUT = get_voice(); # turn to get_voice($scn_current) when fully filled
-	#~ }
 	
 	#TODO: expand rec and get voicestring, probably make new expanding function
-	my $tmp = $scn_all{$scn_current}{"rec"};
-	print "$tmp";
+	#my $tmp = $scn_all{$scn_current}{"rec"};
+	#print "$tmp";
+	print "Input: ";
 	$INPUT = <>;
-	$INPUT = get_voice($scn_current, %scn_all); # turn to get_voice($scn_current) when fully filled
+	#$INPUT = get_voice($scn_current, %scn_all); # turn to get_voice($scn_current) when fully filled
 	
 	# going over all commands that are in the dict of current scenario
-	FL_COMMANDS: for ( keys $dict_all{$scn_current} )
+	FL_COMMANDS: for ( keys $scn_all{$scn_current}{"DictHash"} )
 	{
 		# looping over all commands	except in $comman_default
 
@@ -164,16 +146,17 @@ while ( $scn_current ne "NONE" )
 		
 		# setting important vairiables
 		$command 		= $_;												# current command
-		$listen		= $dict_all{$scn_current}{$_}{"ListenFor"};		# matching string, what we listen for
-		$matchstyle 	= $dict_all{$scn_current}{$_}{"MatchStyle"}; 	# matching style (simple|regex)
-		$action 		= $dict_all{$scn_current}{$_}{"Action"};			# action to do
+		$listen		= $scn_all{$scn_current}{"DictHash"}{$_}{"ListenFor"};		# matching string, what we listen for
+		$matchstyle 	= $scn_all{$scn_current}{"DictHash"}{$_}{"MatchStyle"}; 	# matching style (simple|regex)
+		$action 		= $scn_all{$scn_current}{"DictHash"}{$_}{"Action"};			# action to do
+		
 		
 		print_debug( "LOOP: FL_COMMANDS", $prog_name, $func_name, $deb_th, 0);
 		print_debug( "\$command:\t|$command|", $prog_name, $func_name, $deb_th, 0);
 		print_debug( "\$listen:\t|$listen|", $prog_name, $func_name, $deb_th, 0);
 		print_debug( "\$matchstyle:\t|$matchstyle|", $prog_name, $func_name, $deb_th, 0);
 		print_debug( "\$action:\t|$action|", $prog_name, $func_name, $deb_th, 0);
-		
+
 		
 		# lets check the MatchStyle (this is an ifthenelse-war, but perl
 		# does not consistently support switch statements)	
@@ -184,11 +167,10 @@ while ( $scn_current ne "NONE" )
 			
 			# now put that regex back in and change MatchType, so we 
 			# dont have to do that again
-			$dict_all{$scn_current}{$command}{"ListenFor"} 	= $listen;
-			$dict_all{$scn_current}{$command}{"Action"} 	= $action;
-			$dict_all{$scn_current}{$command}{"MatchStyle"}	= "regex";
+			$scn_all{$scn_current}{"DictHash"}{$command}{"ListenFor"} 	= $listen;
+			$scn_all{$scn_current}{"DictHash"}{$command}{"Action"} 		= $action;
+			$scn_all{$scn_current}{"DictHash"}{$command}{"MatchStyle"}	= "regex";
 		}
-		
 		
 		# matching regex against $INPUT
 		if ( $INPUT =~ /$listen/ )
@@ -233,21 +215,16 @@ while ( $scn_current ne "NONE" )
 	
 	# retreiving next scenario
 	$scn_next = get_next_scenario(	$ismatch,
-									$nextscenariomode,
-									$nomatchmode, 
 									$scn_current, 
 									$scn_start, 
 									$command, 
-									%scn_all, 
-									%dict_all);
+									%scn_all);
 	
 	# stating what has been found to be the next scenario, again
 	print_debug( "NextScenario: |$scn_next|", $prog_name, $func_name, $deb_th, 0);
 	
 	# reset match varliable
 	$ismatch = 0;
-	
-	#$global{'PassMode'} = $scn_all{$scn_current}{'PassMode'} if  ( defined $scn_all{$scn_current}{'PassMode'} );
 	
 	# finally setting current scenario to next scenario
 	$scn_current = $scn_next;
@@ -261,7 +238,7 @@ print_debug( "LEAVING $func_name", $prog_name, $func_name, $deb_th, 0);
 ###     function definitions
 ########################################################################
 
-sub get_next_scenario($$$$$$\%\%)
+sub get_next_scenario($$$$\%)
 {
 	# this function returns the next scenario based on some 
 	# switches (NoMatchMode, NextScenarioMode)
@@ -274,13 +251,14 @@ sub get_next_scenario($$$$$$\%\%)
 	# ~
 	
 	my $ismatch 			= shift;
-	my $nextscenariomode	= shift;
-	my $nomatchmode		= shift;
 	my $scn_current 		= shift;
 	my $scn_start			= shift;
 	my $cmd_current		= shift;
 	my $scn_all			= shift;
-	my $dict_all 			= shift;
+	
+	# setting scenario dependent variables
+	my $nomatchmode			= $$scn_all{$scn_current}{"NoMatchMode"};
+	my $nextscenariomode		= $$scn_all{$scn_current}{"NextScenarioMode"};
 	
 	my $scn_next;
 	
@@ -288,9 +266,9 @@ sub get_next_scenario($$$$$$\%\%)
 	# If NetScenario is found, leave loop over all commands
 	if ( $ismatch )
 	{
-		if (defined $$dict_all{$scn_current}{$cmd_current}{"NextScenario"} )
+		if (defined $$scn_all{$scn_current}{"DictHash"}{$cmd_current}{"NextScenario"} )
 		{
-			$scn_next = $$dict_all{$scn_current}{$cmd_current}{"NextScenario"};
+			$scn_next = $$scn_all{$scn_current}{"DictHash"}{$cmd_current}{"NextScenario"};
 		}
 		elsif ( defined $$scn_all{$scn_current}{"NextScenario"} )
 		{
@@ -358,7 +336,6 @@ sub expand_special_expression($$$\%\%)
 	my $current_scenario	= shift;	# current scenario
 	my $current_command	= shift;
 	my $scenarios 			= shift;	# hash with all scenarios
-	my $dicts				= shift;	# hash with all dicts
 	
 	print_debug( "Expanding expression |$exp|", $prog_name, $func_name, $deb_th, 0);
 	print_debug( "Current scenario is |$current_scenario|", $prog_name, $func_name, $deb_th, 0);
@@ -373,10 +350,10 @@ sub expand_special_expression($$$\%\%)
 		for ( $exp =~ /\!(\w+)/ )
 		{
 			# $_ holds current !exp name without '!'
-			if ( defined $$dicts{$current_scenario}{$current_command}{$_} )
+			if ( defined $$scenarios{$current_scenario}{"DictHash"}{$current_command}{$_} )
 			{
 				# replace found !.. by dict
-				$exp =~ s/\!(\w+)/$$dicts{$current_scenario}{$current_command}{$1}/;
+				$exp =~ s/\!(\w+)/$$scenarios{$current_scenario}{"DictHash"}{$current_command}{$1}/;
 				print_debug( "Rule by command: |$exp|", $prog_name, $func_name, $deb_th, 0);
 			}
 			elsif ( defined $$scenarios{$current_scenario}{$_} )
@@ -522,15 +499,13 @@ sub dict_get_all(\%)
 			# tie each file to a temporary hash and save the reference
 			# to that hash in a different hash
 			tie my %tmp_dict, 'Config::IniFiles', ( -file => "$dict_files{$_}", -default => $command_default );
-			$dict_all{$_} = \%tmp_dict;
+			$$scenarios{$_}{"DictHash"} = \%tmp_dict;
 			
 			# debug information
-			print_debug( "Tied $dict_all{$_} to file $dict_files{$_}", $prog_name, $func_name, $deb_th, 0);
-			
+			print_debug( "Tied $$scenarios{$_}{DictHash} to file $dict_files{$_}", $prog_name, $func_name, $deb_th, 0);
 		}
 	}
 	
-	#print keys $dict_all{"*keyword"};
 	# return hash with all dictionaries
 	print_debug( "LEAVING $func_name", $prog_name, $func_name, $deb_th, 0);
 	return %dict_all;
